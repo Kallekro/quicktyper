@@ -117,7 +117,7 @@ public:
     
     _heightOfDeath = max_y - 4;
 
-    //loadWords(filename);
+    loadWords(filename, true);
 
     getHighscore();
   }
@@ -151,7 +151,14 @@ public:
     }
   }
 
-  void loadWords (std::string filename) {
+  void loadWords (std::string filename, bool debug = false) {
+    if (debug) {
+      std::string words[10] = {"FOR", "WHILE", "VECTOR", "DELTA", "MAIN", "PROGRAMMING", "PYTHON", "GOOGLE", "TUTORIAL", "HELP"};
+      for (int i=0; i<10; i++) {
+        _possibleWords.push_back(words[i]);
+      }
+      return;
+    }  
     std::ifstream input(filename);
     std::string line;
     while (std::getline(input, line)) {
@@ -372,7 +379,8 @@ public:
 
 private:
   std::vector<Word> _words;
-  std::vector<std::string> _possibleWords {"FOR", "WHILE", "VECTOR", "DELTA", "MAIN", "PROGRAMMING", "PYTHON", "GOOGLE", "TUTORIAL", "HELP"};
+  std::vector<std::string> _possibleWords;//
+
   int _max_y, _max_x;
   int _cursor_y, _cursor_x;
   

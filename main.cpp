@@ -19,6 +19,13 @@ bool onWindows = false;
 #include <unistd.h>
 #endif
 
+// TODO
+// DONE (HOPEFULLY) Read words correctly on linux (remove any non characters)
+// Only accept characters as input
+// Make levels of difficulty
+//   * Support different highscores
+
+
 class Word {
 public:
   void initialize(std::string text, int posy, int posx, int speed, double lastMove) {
@@ -117,7 +124,7 @@ public:
     
     _heightOfDeath = max_y - 4;
 
-    loadWords(filename, true);
+    loadWords(filename);
 
     getHighscore();
   }
@@ -131,8 +138,9 @@ public:
       else { // Word reached bottom of screen
         bool targetFlag = true;
         for (int j=0; j < _words.size(); j++) {
-          if (_words[j].getTypedLetterCount() >= _words[i].getTypedLetterCount()) {
+          if (i != j &&_words[j].getTypedLetterCount() >= _words[i].getTypedLetterCount()) {
             targetFlag = false;
+            _debug_string = "HEY";
           }
         }
         if (targetFlag) {
@@ -163,7 +171,12 @@ public:
     std::string line;
     while (std::getline(input, line)) {
       if (line.length() > 1) {
-        _possibleWords.push_back(line);
+        std::string cleanWord = "";
+        for (int i=0; i<line.length(); i++) {
+          int lowerAsciiVal = (int)toupper(line[i]);
+          if (lowerAsciiVal > 64 && lowerAsciiVal < 91) cleanWord += toupper(line[i]); 
+        }
+        _possibleWords.push_back(cleanWord);
       }
     }
     input.close();
@@ -188,7 +201,7 @@ public:
     // For random x pos
     std::uniform_int_distribution<int> posDistribution(0, _max_x - randomWord.length()); 
     // For random speed
-    std::uniform_int_distribution<int> speedDistribution(40, 100);
+    std::uniform_int_distribution<int> speedDistribution(80, 200);
 
     Word word;
     word.initialize(randomWord, 0, posDistribution(randomEngine), _dtime*speedDistribution(randomEngine), _time);
@@ -307,9 +320,15 @@ public:
           case int(' '):
             if (_current_typed_word.length() > 0) _current_typed_word += char(input_c);
             charAdded = true;
+            break;
           default:
-            _current_typed_word += toupper(char(input_c));
-            charAdded = true;
+            if (input_c > 96 && input_c < 123) {
+              input_c -= 32; // subtract to get lower
+            }
+            if (input_c > 64 && input_c < 91) {
+              _current_typed_word += char(input_c);
+              charAdded = true;
+            }
             break;
         }
       }
@@ -386,7 +405,7 @@ private:
   
   double _dtime = 1;
   double _time = 0;
-  int _spawn_time_interval_default = _dtime * 500;
+  int _spawn_time_interval_default = _dtime * 1000;
   int _spawn_time_interval = _spawn_time_interval_default;
   int _last_spawn_time = -_spawn_time_interval;
   std::string _current_typed_word;

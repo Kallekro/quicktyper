@@ -1,6 +1,5 @@
 #include <iostream>
 #include <chrono>
-#include <time.h>
 #include <vector>
 #include <random>
 #include <fstream>
@@ -18,7 +17,7 @@ bool onWindows = false;
 #else
 #include <ncurses.h>
 #include <unistd.h>
-#define _sleep sleep
+sleep
 #endif
 
 class Word {
@@ -362,11 +361,11 @@ public:
       
       // Sleep for frame minimum - time frame took
       if (_dtime - frameTime > 0) {
-        //#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+        #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
         _sleep(_dtime - frameTime); 
-        //#else
-        //std::this_thread::sleep_for(milliseconds(_dtime - frameTime));
-        //#endif
+        #else
+        sleep((_dtime - frameTime)/1000);
+        #endif
       }  
        
     }

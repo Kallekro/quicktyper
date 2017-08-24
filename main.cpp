@@ -2,7 +2,6 @@
 #include <curses.h>
 #include <chrono>
 #include <time.h>
-#include <windows.h>
 #include <vector>
 #include <random>
 #include <fstream>
@@ -11,7 +10,14 @@ typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::seconds milliseconds;
 
 static int speeds[3] = {50, 100, 200};
+bool onWindows = false;
 
+#if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+#include <windows.h>
+#define _sleep Sleep 
+#else
+#include <thread>
+#endif
 
 class Word {
 public:
@@ -353,7 +359,13 @@ public:
       }
       
       // Sleep for frame minimum - time frame took
-      if (_dtime - frameTime > 0) Sleep(_dtime - frameTime); 
+      if (_dtime - frameTime > 0) {
+        #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+        _sleep(_dtime - frameTime); 
+        #else
+        std::this_thread::sleep_for(milliseconds(_dtime - frameTime));
+        #endif
+      }  
        
     }
   }

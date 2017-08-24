@@ -363,7 +363,7 @@ public:
         #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
         _sleep(_dtime - frameTime); 
         #else
-        sleep((_dtime - frameTime)/1000);
+        usleep((_dtime - frameTime)*1000);
         #endif
       }  
        

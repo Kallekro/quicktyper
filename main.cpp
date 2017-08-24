@@ -4,20 +4,19 @@
 #include <random>
 #include <fstream>
 
-typedef std::chrono::high_resolution_clock Clock;
-typedef std::chrono::seconds milliseconds;
-
-static int speeds[3] = {50, 100, 200};
-bool onWindows = false;
-
+// Platform specific includes
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #include <windows.h>
 #include <curses.h>
 #define _sleep Sleep 
 #else
-#include <ncurses.h>
 #include <unistd.h>
+#include <ncurses.h>
 #endif
+
+
+typedef std::chrono::high_resolution_clock Clock;
+typedef std::chrono::seconds milliseconds;
 
 class Word {
 public:
@@ -117,7 +116,7 @@ public:
     
     _heightOfDeath = max_y - 4;
 
-    loadWords(filename);
+    //loadWords(filename);
 
     getHighscore();
   }
@@ -215,7 +214,7 @@ public:
           highest_LC_word = _words[i];
         }
       }
-      _debug_string = highest_LC_word.getText() + ", " + highest_LC_word.getText()[highest_letter_count-1] + ", " + newchar;
+      //_debug_string = highest_LC_word.getText() + ", " + highest_LC_word.getText()[highest_letter_count-1] + ", " + newchar;
       if (highest_LC_word.getLastTypedLetterCount() != highest_LC_word.getTypedLetterCount() && 
           highest_LC_word.getText()[highest_letter_count-1] == newchar) 
       {
@@ -298,8 +297,10 @@ public:
             _current_typed_word = "";
             break;
           case int(' '):
-            if (_current_typed_word.length() > 0) _current_typed_word += char(input_c);
-            charAdded = true;
+            if (_current_typed_word.length() > 0) {
+              _current_typed_word += char(input_c);
+              charAdded = true;
+            }  
           default:
             _current_typed_word += char(input_c);
             charAdded = true;
@@ -372,7 +373,7 @@ public:
 
 private:
   std::vector<Word> _words;
-  std::vector<std::string> _possibleWords; //{"FOR", "WHILE", "VECTOR", "DELTA", "MAIN", "PROGRAMMING", "PYTHON", "GOOGLE", "TUTORIAL", "HELP"};
+  std::vector<std::string> _possibleWords = {"FOR", "WHILE", "VECTOR", "DELTA", "MAIN", "PROGRAMMING", "PYTHON", "GOOGLE", "TUTORIAL", "HELP"};
   int _max_y, _max_x;
   int _cursor_y, _cursor_x;
   

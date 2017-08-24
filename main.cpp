@@ -17,7 +17,6 @@ bool onWindows = false;
 #else
 #include <ncurses.h>
 #include <unistd.h>
-sleep
 #endif
 
 class Word {

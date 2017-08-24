@@ -1,5 +1,4 @@
 #include <iostream>
-#include <curses.h>
 #include <chrono>
 #include <time.h>
 #include <vector>
@@ -14,9 +13,11 @@ bool onWindows = false;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #include <windows.h>
+#include <curses.h>
 #define _sleep Sleep 
 #else
 #include <thread>
+#include <ncurses.h>
 #endif
 
 class Word {

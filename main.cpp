@@ -20,27 +20,29 @@ bool onWindows = false;
 #endif
 
 // TODO
-// DONE (HOPEFULLY) Read words correctly on linux (remove any non characters)
-// Only accept characters as input
 // Make levels of difficulty
 //   * Support different highscores
+
+// ? BACKSPACE does not work on linux ?
+
 
 
 class Word {
 public:
-  void initialize(std::string text, int posy, int posx, int speed, double lastMove) {
+  void initialize(std::string text, int posy, int posx, int speed, double lastMove, bool verticalScrolling=true) {
     _text = text;
     _posx = posx;
     _posy = posy;
     _speed = speed;
     _lastMove = lastMove;
+    _verticalScrolling = verticalScrolling;
   }
 
-  bool update(double newtime, int heightOfDeath) {
+  bool update(double newtime, int placeOfDeath) {
     if (newtime - _lastMove > _speed) {
       moveWord();
       _lastMove = newtime;
-      if (_posy == heightOfDeath) {
+      if ((_verticalScrolling && _posy == placeOfDeath) || (!_verticalScrolling && _posx == placeOfDeath)) {
         printSelf();
         return true;
       }
@@ -73,11 +75,11 @@ public:
    }
  
    void moveWord () {
-     ++_posy;
+     if (_verticalScrolling) ++_posy;
+     else ++_posx;
    }
  
    void printSelf () {
-     //mvprintw(_posy, _posx - _text.length()/2, "%s", _text.c_str());
      move(_posy, _posx);
      attron(COLOR_PAIR(1));
      for (int i = 0; i < _typed_letter_count; i++) {
@@ -108,12 +110,13 @@ public:
    double _lastMove;
    int _typed_letter_count = 0;
    int _last_typed_letter_count = 0;
+   bool _verticalScrolling;
  
  };
 
 class GameManager {
 public:
-  void initialize(int max_y, int max_x, std::string filename, bool forgivingMode) {
+  void initialize(int max_y, int max_x, std::string filename, bool forgivingMode, bool vertScroll=true) {
     _max_y = max_y;
     _max_x = max_x;
 
@@ -122,7 +125,10 @@ public:
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     randomEngine = std::mt19937_64(seed);
     
-    _heightOfDeath = max_y - 4;
+    _vertScroll = vertScroll;
+    
+    if (_vertScroll) _placeOfDeath = max_y - 4;
+    else _placeOfDeath = max_x - 1;
 
     loadWords(filename);
 
@@ -132,7 +138,7 @@ public:
   void update() {
     std::vector<Word> newWords;
     for (int i=0; i < _words.size(); i++) {
-      if (!_words[i].update(_time, _heightOfDeath)) {
+      if (!_words[i].update(_time, _placeOfDeath)) {
         newWords.push_back(_words[i]);
       }
       else { // Word reached bottom of screen
@@ -140,7 +146,6 @@ public:
         for (int j=0; j < _words.size(); j++) {
           if (i != j &&_words[j].getTypedLetterCount() >= _words[i].getTypedLetterCount()) {
             targetFlag = false;
-            _debug_string = "HEY";
           }
         }
         if (targetFlag) {
@@ -198,13 +203,25 @@ public:
     // For random word
     std::uniform_int_distribution<int> wordDistribution(0, _possibleWords.size()-1);
     std::string randomWord = _possibleWords[wordDistribution(randomEngine)];
-    // For random x pos
-    std::uniform_int_distribution<int> posDistribution(0, _max_x - randomWord.length()); 
+
+    // For random pos
+    int r_xpos, r_ypos;
+    if (_vertScroll) {
+      std::uniform_int_distribution<int> posDistribution(0, _max_x - randomWord.length());
+      r_xpos = posDistribution(randomEngine);
+      r_ypos = 0;
+    }  
+    else {
+      std::uniform_int_distribution<int> posDistribution(0, _max_y-5);
+      r_xpos = 0;
+      r_ypos = posDistribution(randomEngine);
+    }  
+     
     // For random speed
-    std::uniform_int_distribution<int> speedDistribution(80, 200);
+    std::uniform_int_distribution<int> speedDistribution(30, 150);
 
     Word word;
-    word.initialize(randomWord, 0, posDistribution(randomEngine), _dtime*speedDistribution(randomEngine), _time);
+    word.initialize(randomWord, r_ypos, r_xpos, _dtime*speedDistribution(randomEngine), _time, _vertScroll);
     _words.push_back(word);
   }
 
@@ -222,7 +239,6 @@ public:
         if (_score % 250 == 0) {
           if (_spawn_time_interval > _dtime) _spawn_time_interval -= _dtime*20;
         }
-        
       }
     }
     _words = newWords;
@@ -235,7 +251,7 @@ public:
           highest_LC_word = _words[i];
         }
       }
-      _debug_string = highest_LC_word.getText() + ", " + highest_LC_word.getText()[highest_letter_count-1] + ", " + newchar;
+      //_debug_string = highest_LC_word.getText() + ", " + highest_LC_word.getText()[highest_letter_count-1] + ", " + newchar;
       if (highest_LC_word.getLastTypedLetterCount() != highest_LC_word.getTypedLetterCount() && 
           highest_LC_word.getText()[highest_letter_count-1] == newchar) 
       {
@@ -303,16 +319,10 @@ public:
             refresh();
             break;
           case 8: // Backspace key
-            //if (!_forgivingMode) {
-              if (_current_typed_word.length() > 0) {
-                _current_typed_word.pop_back();
-              }  
-              charAdded = true;
-            //}  
-            //else {
-            //  move(_cursor_y, _cursor_x);
-            //  refresh();
-            //}
+            if (_current_typed_word.length() > 0) {
+              _current_typed_word.pop_back();
+            }  
+            charAdded = true;
             break;
           case 27: // Escape
             _current_typed_word = "";
@@ -338,7 +348,7 @@ public:
       _time += _dtime;
 
       // Draw seperating line
-      move(_heightOfDeath + 1, 0);
+      move(_max_y - 3, 0);
       for (int i=0; i<_max_x; i++) {
         addch('-');
       }
@@ -361,17 +371,17 @@ public:
       update();
 
       // Draw score
-      mvprintw(_heightOfDeath + 3, 0, "Score: %d", _score);
+      mvprintw(_max_y-1, 0, "Score: %d", _score);
 
       // Draw life
       std::string lifemsg = "LIFE:";
-      mvprintw(_heightOfDeath + 3, _max_x - (lifemsg.length() + std::to_string(_lives).length() + 1), "%s %d", lifemsg.c_str(), _lives);
+      mvprintw(_max_y-1, _max_x - (lifemsg.length() + std::to_string(_lives).length() + 1), "%s %d", lifemsg.c_str(), _lives);
 
       // Debug string
-      mvprintw(0, 0, "DEBUG: %s", _debug_string.c_str());
+      // mvprintw(0, 0, "DEBUG: %s", _debug_string.c_str());
       
       // Draw current word being typed
-      mvprintw(_heightOfDeath + 3, _max_x/2 - _current_typed_word.length()/2, "%s", _current_typed_word.c_str());
+      mvprintw(_max_y-1, _max_x/2 - _current_typed_word.length()/2, "%s", _current_typed_word.c_str());
 
       // Send changes to screen
       refresh(); 
@@ -405,11 +415,13 @@ private:
   
   double _dtime = 1;
   double _time = 0;
-  int _spawn_time_interval_default = _dtime * 1000;
+  int _spawn_time_interval_default = _dtime * 750;
   int _spawn_time_interval = _spawn_time_interval_default;
   int _last_spawn_time = -_spawn_time_interval;
   std::string _current_typed_word;
-  int _heightOfDeath;
+  int _placeOfDeath;
+  bool _vertScroll;
+
   int _score = 0;
   int _highscore;
   
@@ -439,7 +451,7 @@ int main(int argc, char *argv[]) {
   init_pair(1, COLOR_RED, COLOR_BLACK);
 
   GameManager gameManager;
-  gameManager.initialize(max_y, max_x, "words.txt", true);
+  gameManager.initialize(max_y, max_x, "words.txt", true, false);
   gameManager.gameLoop();
  
   endwin();

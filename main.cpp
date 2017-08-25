@@ -8,7 +8,6 @@ typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::seconds milliseconds;
 
 static int speeds[3] = {50, 100, 200};
-bool onWindows = false;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #include <windows.h>
@@ -25,8 +24,6 @@ bool onWindows = false;
 
 // ? BACKSPACE does not work on linux ?
 
-
-
 class Word {
 public:
   void initialize(std::string text, int posy, int posx, int speed, double lastMove, bool verticalScrolling=true) {
@@ -42,7 +39,8 @@ public:
     if (newtime - _lastMove > _speed) {
       moveWord();
       _lastMove = newtime;
-      if ((_verticalScrolling && _posy == placeOfDeath) || (!_verticalScrolling && _posx == placeOfDeath)) {
+      if ((_verticalScrolling && _posy == placeOfDeath) 
+          || (!_verticalScrolling && _posx + _text.length() - 1 == placeOfDeath)) {
         printSelf();
         return true;
       }
@@ -370,12 +368,13 @@ public:
       // Update game logic
       update();
 
-      // Draw score
-      mvprintw(_max_y-1, 0, "Score: %d", _score);
+      // Draw score and highscore
+      mvprintw(_max_y-2, 0, "Score: %d", _score);
+      mvprintw(_max_y-1, 0, "Highscore: %d", _highscore);
 
       // Draw life
       std::string lifemsg = "LIFE:";
-      mvprintw(_max_y-1, _max_x - (lifemsg.length() + std::to_string(_lives).length() + 1), "%s %d", lifemsg.c_str(), _lives);
+      mvprintw(_max_y-2, _max_x - (lifemsg.length() + std::to_string(_lives).length() + 1), "%s %d", lifemsg.c_str(), _lives);
 
       // Debug string
       // mvprintw(0, 0, "DEBUG: %s", _debug_string.c_str());

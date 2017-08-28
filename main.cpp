@@ -5,14 +5,13 @@
 #include <fstream>
 
 typedef std::chrono::high_resolution_clock Clock;
-typedef std::chrono::seconds milliseconds;
-
-static int speeds[3] = {50, 100, 200};
+//typedef std::chrono::milliseconds milliseconds;
+typedef std::chrono::microseconds microseconds;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
+#define WINDOWS_SYS
 #include <windows.h>
 #include <curses.h>
-#define _sleep Sleep 
 #else
 #include <ncurses.h>
 #include <unistd.h>
@@ -26,7 +25,7 @@ static int speeds[3] = {50, 100, 200};
 
 class Word {
 public:
-  void initialize(std::string text, int posy, int posx, int speed, double lastMove, bool verticalScrolling=true) {
+  void initialize(std::string text, int posy, int posx, int speed, unsigned int lastMove, bool verticalScrolling=true) {
     _text = text;
     _posx = posx;
     _posy = posy;
@@ -35,7 +34,7 @@ public:
     _verticalScrolling = verticalScrolling;
   }
 
-  bool update(double newtime, int placeOfDeath) {
+  bool update(unsigned int newtime, int placeOfDeath) {
     if (newtime - _lastMove > _speed) {
       moveWord();
       _lastMove = newtime;
@@ -105,7 +104,7 @@ public:
    std::string _text;
    int _posy, _posx;
    int _speed;
-   double _lastMove;
+   unsigned int _lastMove;
    int _typed_letter_count = 0;
    int _last_typed_letter_count = 0;
    bool _verticalScrolling;
@@ -216,7 +215,7 @@ public:
     }  
      
     // For random speed
-    std::uniform_int_distribution<int> speedDistribution(30, 150);
+    std::uniform_int_distribution<int> speedDistribution(15, 40);
 
     Word word;
     word.initialize(randomWord, r_ypos, r_xpos, _dtime*speedDistribution(randomEngine), _time, _vertScroll);
@@ -234,8 +233,8 @@ public:
         letterMatch = true;
         _current_typed_word = "";
         _score += 50;
-        if (_score % 250 == 0) {
-          if (_spawn_time_interval > _dtime) _spawn_time_interval -= _dtime*20;
+        if (_score % 150 == 0) {
+          if (_spawn_time_interval > _dtime) _spawn_time_interval -= _dtime;
         }
       }
     }
@@ -249,7 +248,6 @@ public:
           highest_LC_word = _words[i];
         }
       }
-      //_debug_string = highest_LC_word.getText() + ", " + highest_LC_word.getText()[highest_letter_count-1] + ", " + newchar;
       if (highest_LC_word.getLastTypedLetterCount() != highest_LC_word.getTypedLetterCount() && 
           highest_LC_word.getText()[highest_letter_count-1] == newchar) 
       {
@@ -299,9 +297,18 @@ public:
   }
   
   void gameLoop () {
+    _last_update_time = Clock::now();      
+    unsigned int frameTime = 0;
     int input_c;
     while (input_c != KEY_F(1)) { // Press F1 key to quit game loop
       Clock::time_point startOfFrame = Clock::now();
+      unsigned int elapsed_time = std::chrono::duration_cast<microseconds>(startOfFrame - _last_update_time).count();
+      if (frameTime > 0 && frameTime < 1000) {
+        while (elapsed_time < 1000 - frameTime ) {
+          startOfFrame = Clock::now();
+          elapsed_time = std::chrono::duration_cast<microseconds>(startOfFrame - _last_update_time).count();
+        }
+      }
 
       getyx (stdscr, _cursor_y, _cursor_x); // Store the cursors current position
 
@@ -377,7 +384,7 @@ public:
       mvprintw(_max_y-2, _max_x - (lifemsg.length() + std::to_string(_lives).length() + 1), "%s %d", lifemsg.c_str(), _lives);
 
       // Debug string
-      // mvprintw(0, 0, "DEBUG: %s", _debug_string.c_str());
+      mvprintw(0, 0, "DEBUG: %s", _debug_string.c_str());
       
       // Draw current word being typed
       mvprintw(_max_y-1, _max_x/2 - _current_typed_word.length()/2, "%s", _current_typed_word.c_str());
@@ -385,20 +392,23 @@ public:
       // Send changes to screen
       refresh(); 
 
-      // Get time it took for frame to end. It was probably 0 
-      Clock::time_point endOfFrame = Clock::now();
-      float frameTime = std::chrono::duration_cast<milliseconds>(endOfFrame - startOfFrame).count();
+      //_debug_string = std::to_string(_time);
       
       if (_dead) {
         displayEndScreen();
       }
+
+      Clock::time_point endOfFrame = Clock::now();
+      frameTime = std::chrono::duration_cast<std::chrono::microseconds>(endOfFrame - startOfFrame).count();
+      
+      _last_update_time = Clock::now();
       
       // Sleep for frame minimum - time frame took
       if (_dtime - frameTime > 0) {
-        #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
-        _sleep(_dtime - frameTime); 
+        #ifdef WINDOWS_SYS 
+       // Sleep((_dtime - frameTime)); 
         #else
-        usleep((_dtime - frameTime)*1000);
+       // usleep((_dtime - frameTime)*1000);
         #endif
       }  
        
@@ -412,17 +422,20 @@ private:
   int _max_y, _max_x;
   int _cursor_y, _cursor_x;
   
-  double _dtime = 1;
-  double _time = 0;
-  int _spawn_time_interval_default = _dtime * 750;
-  int _spawn_time_interval = _spawn_time_interval_default;
-  int _last_spawn_time = -_spawn_time_interval;
+  unsigned int _dtime = 1;
+  unsigned int _time = 0;
+
+  Clock::time_point _last_update_time;
+
+  unsigned int _spawn_time_interval_default = _dtime * 200;
+  unsigned int _spawn_time_interval = _spawn_time_interval_default;
+  unsigned int _last_spawn_time = -_spawn_time_interval;
   std::string _current_typed_word;
   int _placeOfDeath;
   bool _vertScroll;
 
-  int _score = 0;
-  int _highscore;
+  unsigned int _score = 0;
+  unsigned int _highscore;
   
   int _lives = 3;
   bool _dead = false;

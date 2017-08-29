@@ -14,7 +14,7 @@ typedef std::chrono::microseconds microseconds;
 #include <windows.h>
 #include <curses.h>
 #else
-#define ALT_BACKSPACE 127
+#define ALT_BACKSPACE 263 
 #include <ncurses.h>
 #include <unistd.h>
 #endif
@@ -510,6 +510,7 @@ public:
         
       } else {
         // If there was any input
+              
         switch (input_c) {
           case int('\n'): // Enter key
             move (_cursor_y, _cursor_x); // Enter key automatically moves cursor down, so reset position
@@ -576,7 +577,7 @@ public:
       mvprintw(_max_y-2, _max_x - (lifemsg.length() + std::to_string(_lives).length() + 1), "%s %d", lifemsg.c_str(), _lives);
 
       // Debug string
-      //mvprintw(0, 0, "DEBUG: %s", _debug_string.c_str());
+      //mvprintw(0, 0, "DEBUG: %d", _debug_string);
       
       // Draw current word being typed
       mvprintw(_max_y-1, _max_x/2 - _current_typed_word.length()/2, "%s", _current_typed_word.c_str());

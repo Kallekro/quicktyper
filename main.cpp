@@ -10,9 +10,11 @@ typedef std::chrono::microseconds microseconds;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
 #define WINDOWS_SYS
+#define ALT_BACKSPACE 8 
 #include <windows.h>
 #include <curses.h>
 #else
+#define ALT_BACKSPACE 127
 #include <ncurses.h>
 #include <unistd.h>
 #endif
@@ -513,7 +515,7 @@ public:
             move (_cursor_y, _cursor_x); // Enter key automatically moves cursor down, so reset position
             refresh();
             break;
-          case 8: // Backspace key
+          case ALT_BACKSPACE: // Backspace key
             if (_current_typed_word.length() > 0) {
               _current_typed_word.pop_back();
             }  

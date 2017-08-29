@@ -404,10 +404,10 @@ public:
       }
       xposAdjuster -= 15;
     }
-    char startMsg[60] = "Use arrow keys to select desired settings";
-    char finalMsg[30] = "Press Enter to continue.";      
-    mvprintw(_max_y / 2 - 6, _max_x / 2 - strlen(startMsg)/2, startMsg);
-    mvprintw(_max_y / 2 + 6, _max_x / 2 - strlen(finalMsg)/2, finalMsg);
+    std::string startMsg = "Use arrow keys to select desired settings";
+    std::string finalMsg = "Press Enter to continue.";      
+    mvprintw(_max_y / 2 - 6, _max_x / 2 - startMsg.length()/2, startMsg.c_str());
+    mvprintw(_max_y / 2 + 6, _max_x / 2 - finalMsg.length()/2, finalMsg.c_str());
   }
   
   void chooseGameMode() {

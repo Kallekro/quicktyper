@@ -3,9 +3,9 @@
 #include <vector>
 #include <random>
 #include <fstream>
+#include <stdio.h>
 
 typedef std::chrono::high_resolution_clock Clock;
-//typedef std::chrono::milliseconds milliseconds;
 typedef std::chrono::microseconds microseconds;
 
 #if defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)
@@ -18,14 +18,19 @@ typedef std::chrono::microseconds microseconds;
 #endif
 
 // TODO
-// Make levels of difficulty
-//   * Support different highscores
+// DONE Make levels of difficulty
+// DONE  * Support different highscores
+// The highscore file is not generated properly but works if already exist
+
+// Avoid word collision
 
 // ? BACKSPACE does not work on linux ?
 
+enum Difficulty {EASY, MEDIUM, HARD, NONE};
+
 class Word {
 public:
-  void initialize(std::string text, int posy, int posx, int speed, unsigned int lastMove, bool verticalScrolling=true) {
+  void initialize(std::string text, int posy, int posx, int speed, unsigned int lastMove, bool verticalScrolling) {
     _text = text;
     _posx = posx;
     _posy = posy;
@@ -113,19 +118,39 @@ public:
 
 class GameManager {
 public:
-  void initialize(int max_y, int max_x, std::string filename, bool forgivingMode, bool vertScroll=true) {
+  void initialize(int max_y, int max_x, std::string filename) {
     _max_y = max_y;
     _max_x = max_x;
 
-    _forgivingMode = forgivingMode;
+    chooseGameMode();
+
+    switch (_difficulty) {
+      case EASY:
+        _speed_range[0] = 150;
+        _speed_range[1] = 300;      
+        _spawn_time_interval_default = _dtime * 2000;
+        _spawn_time_decay = 10;
+        break;
+      case MEDIUM:
+        _speed_range[0] = 60;
+        _speed_range[1] = 200;      
+        _spawn_time_interval_default = _dtime * 1500;
+        _spawn_time_decay = 15;
+        break;
+      case HARD:
+        _speed_range[0] = 40;
+        _speed_range[1] = 176;      
+        _spawn_time_interval_default = _dtime * 1000;
+        _spawn_time_decay = 20;
+        break;
+    }
+
+    _spawn_time_interval = _spawn_time_interval_default;
+    _last_spawn_time = -_spawn_time_interval;
 
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
     randomEngine = std::mt19937_64(seed);
     
-    _vertScroll = vertScroll;
-    
-    if (_vertScroll) _placeOfDeath = max_y - 4;
-    else _placeOfDeath = max_x - 1;
 
     loadWords(filename);
 
@@ -186,14 +211,71 @@ public:
 
   void getHighscore() {
     std::ifstream input("_highscore.txt");
+    int skip;
+    switch (_difficulty) {
+      case MEDIUM:
+        skip = 1;      
+        break;
+      case HARD:
+        skip = 2;
+        break;
+      default:
+        skip = 0;
+        break;
+    }
     if (input.good()) {
       std::string highscore_tmp;
-      getline(input, highscore_tmp);
-      _highscore = std::stoi(highscore_tmp);
+      while (skip >= 0) {
+        getline(input, highscore_tmp);
+        skip--;
+      }  
+      try {
+        _highscore = std::stoi(highscore_tmp);
+      }
+      catch (std::invalid_argument& ex) {
+        _highscore = 0;
+      }
     } else {
       _highscore = 0;
     }
     input.close();
+  }
+
+  void saveHighscore() {
+    int skip;
+    switch (_difficulty) {
+      case MEDIUM:
+        skip = 1;      
+        break;
+      case HARD:
+        skip = 2;
+        break;
+      default:
+        skip = 0;
+        break;
+    }
+
+    std::ifstream infile ("_highscore.txt");
+
+    std::string finalStr = "";      
+    if (!infile.good()) {
+      for (int i=0; i<3; i++) {
+        if (i == skip) finalStr += std::to_string(_highscore) + '\n';
+        else finalStr += "0" + '\n';
+      }  
+    }
+    else {
+      std::string tempStr;
+      while (infile >> tempStr) {
+        if (skip == 0) tempStr = std::to_string(_highscore);
+        skip--; 
+        finalStr += tempStr + '\n';
+      }
+      infile.close();
+    }
+    std::ofstream outfile ("_highscore.txt");
+    outfile << finalStr;
+    outfile.close();
   }
 
   void spawnNewWord () {
@@ -215,7 +297,7 @@ public:
     }  
      
     // For random speed
-    std::uniform_int_distribution<int> speedDistribution(15, 40);
+    std::uniform_int_distribution<int> speedDistribution(_speed_range[0], _speed_range[1]);
 
     Word word;
     word.initialize(randomWord, r_ypos, r_xpos, _dtime*speedDistribution(randomEngine), _time, _vertScroll);
@@ -234,7 +316,7 @@ public:
         _current_typed_word = "";
         _score += 50;
         if (_score % 150 == 0) {
-          if (_spawn_time_interval > _dtime) _spawn_time_interval -= _dtime;
+          if (_spawn_time_interval > _dtime) _spawn_time_interval -= _spawn_time_decay*_dtime;
         }
       }
     }
@@ -271,9 +353,7 @@ public:
       mvprintw(_max_y/2 + 3, _max_x/2 - (msg3b.length() + std::to_string(_highscore).length() + 1)/2, "%s %d", msg3b.c_str(), _highscore);
       
       _highscore = _score;
-      std::ofstream outfile ("_highscore.txt");
-      outfile << _score << std::endl;
-      outfile.close();
+      saveHighscore();
     }
     else {
       std::string msg3 = "HIGHSCORE:";
@@ -295,16 +375,126 @@ public:
     while ((continueInput = getch()) != int('\n')) {
     }
   }
+
+  int wrapAroundArray (int n, int k) {
+    if (k >= n) return 0;
+    else if (k < 0) return n-1;
+    else return k;
+  }        
+
+  void printMenus (std::string *menus[], int *indexes, int curr_menu_group) {
+    int xposAdjuster = 15;
+    int ypos;
+    for (int k=0; k < 3; k++) {
+      // Draw pointer to menu group      
+      if (k == curr_menu_group) {
+        mvprintw(_max_y/2 - 3, _max_x/2 - xposAdjuster - 1, "||");
+      }
+      // Draw each menu group
+      std::string *strArr = menus[k];
+      int i = 0;      
+      ypos = _max_y / 2 - 1;
+      while (strArr[i] != "0") {
+        // Draw with colors if chosen menu      
+        if (indexes[k] == i) attron(COLOR_PAIR(1));      
+        mvprintw(ypos, _max_x / 2 - xposAdjuster - strArr[i].length()/2, strArr[i].c_str()); 
+        if (indexes[k] == i) attroff(COLOR_PAIR(1));      
+        ypos += 2;
+        i++;
+      }
+      xposAdjuster -= 15;
+    }
+    char startMsg[60] = "Use arrow keys to select desired settings";
+    char finalMsg[30] = "Press Enter to continue.";      
+    mvprintw(_max_y / 2 - 6, _max_x / 2 - strlen(startMsg)/2, startMsg);
+    mvprintw(_max_y / 2 + 6, _max_x / 2 - strlen(finalMsg)/2, finalMsg);
+  }
   
+  void chooseGameMode() {
+    std::string menus_diff[4] = {"Easy", "Medium", "Hard", "0"};
+    std::string menus_mode[3] = {"Forgiving", "Not forgiving", "0"};
+    std::string menus_dir[3] = {"Horizontal", "Vertical", "0"};
+    std::string *all_menus[3] = {menus_diff, menus_mode, menus_dir};
+
+    int menu_indexes[3] = {1, 0, 0};
+
+    int curr_menu_group = 0;
+    bool menuChosen = false;
+    int input_c;
+    nodelay(stdscr, FALSE);
+
+    printMenus(all_menus, menu_indexes, curr_menu_group);
+
+    while ((input_c = getch()) != KEY_F(1)) {
+      clear();
+
+      int idx;
+      switch (input_c) {
+        case 10: // Enter key
+          menuChosen = true;        
+          break;
+        case KEY_LEFT:
+          curr_menu_group = wrapAroundArray(3, curr_menu_group - 1);
+          break;
+        case KEY_RIGHT:  
+          curr_menu_group = wrapAroundArray(3, curr_menu_group + 1);
+          break;
+        case KEY_UP:
+          idx = menu_indexes[curr_menu_group];
+          if (curr_menu_group == 0) menu_indexes[curr_menu_group] = wrapAroundArray(3, idx-1); 
+          else menu_indexes[curr_menu_group] = wrapAroundArray(2, idx-1); 
+          break;
+        case KEY_DOWN:
+          idx = menu_indexes[curr_menu_group];
+          if (curr_menu_group == 0) menu_indexes[curr_menu_group] = wrapAroundArray(3, idx+1); 
+          else menu_indexes[curr_menu_group] = wrapAroundArray(2, idx+1); 
+          break;
+        default:  
+          break;
+      }
+      if (menuChosen) break;
+      printMenus(all_menus, menu_indexes, curr_menu_group);
+    }
+    
+    switch (menu_indexes[0]) {
+      case 0:
+        _difficulty = EASY;
+        break; 
+      case 1:
+        _difficulty = MEDIUM;
+        break;
+      case 2:
+        _difficulty = HARD;
+        break;
+      default:
+        _difficulty = NONE;
+        break;
+    }
+
+    if (menu_indexes[1] == 0) _forgivingMode = true;
+    else _forgivingMode = false;
+    
+    if (menu_indexes[2] == 1) { 
+      _vertScroll = true;
+      _placeOfDeath = _max_y - 4;
+    }  
+    else {
+      _vertScroll = false;
+      _placeOfDeath = _max_x - 1;
+    }
+
+  } 
+
   void gameLoop () {
+    nodelay(stdscr, TRUE);
     _last_update_time = Clock::now();      
     unsigned int frameTime = 0;
     int input_c;
     while (input_c != KEY_F(1)) { // Press F1 key to quit game loop
       Clock::time_point startOfFrame = Clock::now();
       unsigned int elapsed_time = std::chrono::duration_cast<microseconds>(startOfFrame - _last_update_time).count();
-      if (frameTime > 0 && frameTime < 1000) {
-        while (elapsed_time < 1000 - frameTime ) {
+      if (frameTime > 0 && frameTime < 2000) {
+        while (elapsed_time < 2000 - frameTime ) {
           startOfFrame = Clock::now();
           elapsed_time = std::chrono::duration_cast<microseconds>(startOfFrame - _last_update_time).count();
         }
@@ -384,7 +574,7 @@ public:
       mvprintw(_max_y-2, _max_x - (lifemsg.length() + std::to_string(_lives).length() + 1), "%s %d", lifemsg.c_str(), _lives);
 
       // Debug string
-      mvprintw(0, 0, "DEBUG: %s", _debug_string.c_str());
+      //mvprintw(0, 0, "DEBUG: %s", _debug_string.c_str());
       
       // Draw current word being typed
       mvprintw(_max_y-1, _max_x/2 - _current_typed_word.length()/2, "%s", _current_typed_word.c_str());
@@ -392,8 +582,6 @@ public:
       // Send changes to screen
       refresh(); 
 
-      //_debug_string = std::to_string(_time);
-      
       if (_dead) {
         displayEndScreen();
       }
@@ -402,16 +590,6 @@ public:
       frameTime = std::chrono::duration_cast<std::chrono::microseconds>(endOfFrame - startOfFrame).count();
       
       _last_update_time = Clock::now();
-      
-      // Sleep for frame minimum - time frame took
-      if (_dtime - frameTime > 0) {
-        #ifdef WINDOWS_SYS 
-       // Sleep((_dtime - frameTime)); 
-        #else
-       // usleep((_dtime - frameTime)*1000);
-        #endif
-      }  
-       
     }
   }
 
@@ -427,9 +605,15 @@ private:
 
   Clock::time_point _last_update_time;
 
-  unsigned int _spawn_time_interval_default = _dtime * 200;
-  unsigned int _spawn_time_interval = _spawn_time_interval_default;
-  unsigned int _last_spawn_time = -_spawn_time_interval;
+  Difficulty _difficulty;
+
+  int _speed_range[2];
+
+  unsigned int _spawn_time_interval_default;
+  unsigned int _spawn_time_interval;
+  unsigned int _last_spawn_time;
+  unsigned int _spawn_time_decay;
+
   std::string _current_typed_word;
   int _placeOfDeath;
   bool _vertScroll;
@@ -463,7 +647,7 @@ int main(int argc, char *argv[]) {
   init_pair(1, COLOR_RED, COLOR_BLACK);
 
   GameManager gameManager;
-  gameManager.initialize(max_y, max_x, "words.txt", true, false);
+  gameManager.initialize(max_y, max_x, "words.txt");
   gameManager.gameLoop();
  
   endwin();

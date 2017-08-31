@@ -1,7 +1,7 @@
-## quicktyper
+# quicktyper
 A simple console game in which you type words on your screen.
 
-# installation
+## installation
 You need the Unix library ncurses or the Windows library pdcurses.
 
 Compile the game using following command:

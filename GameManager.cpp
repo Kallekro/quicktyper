@@ -22,41 +22,6 @@ typedef std::chrono::high_resolution_clock Clock;
 typedef std::chrono::microseconds microseconds;
 
 GameManager::GameManager (int max_y, int max_x, std::string filename) {
-//  std::vector<Word> _words;
-//  std::vector<std::string> _possibleWords;//
-//  
-//  int _max_y, _max_x;
-//  int _cursor_y, _cursor_x;
-//  
-//  unsigned int _dtime = 1;
-//  unsigned int _time = 0;
-//  
-//  Clock::time_point _last_update_time;
-//  
-//  Difficulty _difficulty;
-//  
-//  int _speed_range[2];
-//  
-//  unsigned int _spawn_time_interval_default;
-//  unsigned int _spawn_time_interval;
-//  unsigned int _last_spawn_time;
-//  unsigned int _spawn_time_decay;
-//  
-//  std::string _current_typed_word;
-//  int _placeOfDeath;
-//  bool _vertScroll;
-//  
-//  unsigned int _score;
-//  unsigned int _highscore;
-//  
-//  int _lives;
-//  bool _dead;
-//  
-//  bool _forgivingMode;
-//  
-//  std::string _debug_string;
-//  
-//  std::mt19937_64 randomEngine;
   _max_y = max_y;
   _max_x = max_x;
 
@@ -539,6 +504,3 @@ void GameManager::gameLoop () {
     _last_update_time = Clock::now();
   }
 }
-
-
-

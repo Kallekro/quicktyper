@@ -21,13 +21,6 @@
 
 
 Word::Word(std::string text, int posy, int posx, int speed, unsigned int lastMove, bool verticalScrolling) {
- // std::string _text;
- // int _posy, _posx;
- // int _speed;
- // unsigned int _lastMove;
- // int _typed_letter_count;
- // int _last_typed_letter_count;
- // bool _verticalScrolling;
   _text = text;
   _posx = posx;
   _posy = posy;
@@ -104,5 +97,4 @@ int Word::getTypedLetterCount () {
 int Word::getLastTypedLetterCount () {
   return _last_typed_letter_count;
 }
-
 

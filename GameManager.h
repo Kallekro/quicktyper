@@ -8,11 +8,12 @@
 
 typedef std::chrono::high_resolution_clock Clock;
 
-enum Difficulty {EASY, MEDIUM, HARD, NONE};
+enum Difficulty {EASY, MEDIUM, HARD, STRESS, NONE};
 
 class GameManager {
 private:
   std::vector<Word> _words;
+  int _words_max_size;
   std::vector<std::string> _possibleWords;
 
   int _max_y, _max_x;
@@ -42,6 +43,7 @@ private:
   int _lives;
 
   bool _dead;
+  bool _immortal;
 
   bool _forgivingMode;
 

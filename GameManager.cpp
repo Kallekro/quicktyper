@@ -31,6 +31,7 @@ GameManager::GameManager (int max_y, int max_x, std::string filename) {
   _score = 0;
   _lives = 3;
   _dead = false;
+  _immortal = false;
 
   _debug_string = "";
 
@@ -55,6 +56,12 @@ GameManager::GameManager (int max_y, int max_x, std::string filename) {
       _spawn_time_interval_default = _dtime * 1000;
       _spawn_time_decay = 20;
       break;
+    case STRESS:
+      _speed_range[0] = 2;
+      _speed_range[1] = 10;
+      _spawn_time_interval_default = _dtime * 2;
+      _spawn_time_decay = 1;
+      _immortal = true;
   }
 
   _spawn_time_interval = _spawn_time_interval_default;
@@ -63,7 +70,8 @@ GameManager::GameManager (int max_y, int max_x, std::string filename) {
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
   randomEngine = std::mt19937_64(seed);
   
-
+  _words_max_size = 200;
+  _words.reserve(_words_max_size);
   loadWords(filename);
 
   getHighscore();
@@ -75,7 +83,7 @@ void GameManager::update() {
     if (!_words[i].update(_time, _placeOfDeath)) {
       newWords.push_back(_words[i]);
     }
-    else { // Word reached bottom of screen
+    else { // Word reached bottom or side of screen
       bool targetFlag = true;
       for (int j=0; j < _words.size(); j++) {
         if (i != j &&_words[j].getTypedLetterCount() >= _words[i].getTypedLetterCount()) {
@@ -86,13 +94,14 @@ void GameManager::update() {
         _current_typed_word = "";
       }
       _lives--;
-      if (_lives <= 0) {
+      if (_lives <= 0 && !_immortal) {
         _dead = true;
       }
     }
   }
   _words = newWords;
-  if (_time - _last_spawn_time > _spawn_time_interval) {
+  if (_time - _last_spawn_time > _spawn_time_interval
+      && _words.size() < 200) {
     spawnNewWord();
     _last_spawn_time = _time;
   }
@@ -125,6 +134,9 @@ void GameManager::getHighscore() {
   std::ifstream input("_highscore.txt");
   int skip;
   switch (_difficulty) {
+    case EASY:        
+      skip = 0;
+      break;
     case MEDIUM:
       skip = 1;      
       break;
@@ -132,8 +144,8 @@ void GameManager::getHighscore() {
       skip = 2;
       break;
     default:
-      skip = 0;
-      break;
+      _highscore = 9999;
+      return;
   }
   if (input.good()) {
     std::string highscore_tmp;
@@ -156,6 +168,9 @@ void GameManager::getHighscore() {
 void GameManager::saveHighscore() {
   int skip;
   switch (_difficulty) {
+    case EASY:
+      skip = 0;
+      break;
     case MEDIUM:
       skip = 1;      
       break;
@@ -163,8 +178,7 @@ void GameManager::saveHighscore() {
       skip = 2;
       break;
     default:
-      skip = 0;
-      break;
+      return;
   }
 
   std::ifstream infile ("_highscore.txt");
@@ -206,7 +220,15 @@ void GameManager::spawnNewWord () {
     std::uniform_int_distribution<int> posDistribution(0, _max_y-5);
     r_xpos = 0;
     r_ypos = posDistribution(randomEngine);
+     
+    // Check for collision
+    for (int i=0; i<randomWord.length(); i++) {
+      char c = char(mvinch(r_ypos, r_xpos + i));
+      
+      _debug_string += c;
+    }
   }  
+
    
   // For random speed
   std::uniform_int_distribution<int> speedDistribution(_speed_range[0], _speed_range[1]);
@@ -227,7 +249,7 @@ bool GameManager::checkAllWordsMatch (char newchar) {
       _current_typed_word = "";
       _score += 50;
       if (_score % 150 == 0) {
-        if (_spawn_time_interval > _dtime) _spawn_time_interval -= _spawn_time_decay*_dtime;
+        if (_spawn_time_interval > _dtime*5) _spawn_time_interval -= _spawn_time_decay*_dtime;
       }
     }
   }
@@ -322,7 +344,7 @@ void GameManager::printMenus (std::string *menus[], int *indexes, int curr_menu_
 }
   
 void GameManager::chooseGameMode() {
-  std::string menus_diff[4] = {"Easy", "Medium", "Hard", "0"};
+  std::string menus_diff[5] = {"Easy", "Medium", "Hard", "STRESS","0"};
   std::string menus_mode[3] = {"Forgiving", "Not forgiving", "0"};
   std::string menus_dir[3] = {"Horizontal", "Vertical", "0"};
   std::string *all_menus[3] = {menus_diff, menus_mode, menus_dir};
@@ -352,12 +374,12 @@ void GameManager::chooseGameMode() {
         break;
       case KEY_UP:
         idx = menu_indexes[curr_menu_group];
-        if (curr_menu_group == 0) menu_indexes[curr_menu_group] = wrapAroundArray(3, idx-1); 
+        if (curr_menu_group == 0) menu_indexes[curr_menu_group] = wrapAroundArray(4, idx-1); 
         else menu_indexes[curr_menu_group] = wrapAroundArray(2, idx-1); 
         break;
       case KEY_DOWN:
         idx = menu_indexes[curr_menu_group];
-        if (curr_menu_group == 0) menu_indexes[curr_menu_group] = wrapAroundArray(3, idx+1); 
+        if (curr_menu_group == 0) menu_indexes[curr_menu_group] = wrapAroundArray(4, idx+1); 
         else menu_indexes[curr_menu_group] = wrapAroundArray(2, idx+1); 
         break;
       default:  
@@ -376,6 +398,9 @@ void GameManager::chooseGameMode() {
       break;
     case 2:
       _difficulty = HARD;
+      break;
+    case 3:
+      _difficulty = STRESS;
       break;
     default:
       _difficulty = NONE;
@@ -486,7 +511,7 @@ void GameManager::gameLoop () {
     mvprintw(_max_y-2, _max_x - (lifemsg.length() + std::to_string(_lives).length() + 1), "%s %d", lifemsg.c_str(), _lives);
 
     // Debug string
-    //mvprintw(0, 0, "DEBUG: %d", _debug_string);
+    mvprintw(0, 0, "DEBUG: %s", _debug_string);
     
     // Draw current word being typed
     mvprintw(_max_y-1, _max_x/2 - _current_typed_word.length()/2, "%s", _current_typed_word.c_str());

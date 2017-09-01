@@ -27,6 +27,9 @@ GameManager::GameManager (int max_y, int max_x, std::string filename) {
 
   _dtime = 1;
   _time = 0;
+  
+  _words_max_size = 200;
+  _words.reserve(_words_max_size);
 
   _score = 0;
   _lives = 3;
@@ -70,8 +73,6 @@ GameManager::GameManager (int max_y, int max_x, std::string filename) {
   unsigned seed = std::chrono::system_clock::now().time_since_epoch().count();
   randomEngine = std::mt19937_64(seed);
   
-  _words_max_size = 200;
-  _words.reserve(_words_max_size);
   loadWords(filename);
 
   getHighscore();
@@ -124,7 +125,7 @@ void GameManager::loadWords (std::string filename, bool debug) {
         int lowerAsciiVal = (int)toupper(line[i]);
         if (lowerAsciiVal > 64 && lowerAsciiVal < 91) cleanWord += toupper(line[i]); 
       }
-      _possibleWords.push_back(cleanWord);
+      if (cleanWord.length() > 0) _possibleWords.push_back(cleanWord);
     }
   }
   input.close();
@@ -222,11 +223,11 @@ void GameManager::spawnNewWord () {
     r_ypos = posDistribution(randomEngine);
      
     // Check for collision
-    for (int i=0; i<randomWord.length(); i++) {
-      char c = char(mvinch(r_ypos, r_xpos + i));
-      
-      _debug_string += c;
-    }
+    // for (int i=0; i<randomWord.length(); i++) {
+    //  char c = char(mvinch(r_ypos, r_xpos + i));
+    //  
+    //  _debug_string += c;
+    //}
   }  
 
    
@@ -452,21 +453,24 @@ void GameManager::gameLoop () {
           break;
         case ALT_BACKSPACE: // Backspace key
           if (_current_typed_word.length() > 0) {
+            if (_current_typed_word.length() > 1) charAdded = true;     
             _current_typed_word.pop_back();
           }  
-          charAdded = true;
           break;
         case 27: // Escape
           _current_typed_word = "";
           break;
         case int(' '):
-          if (_current_typed_word.length() > 0) _current_typed_word += char(input_c);
-          charAdded = true;
+          if (_current_typed_word.length() > 0) {
+            _current_typed_word += char(input_c);
+            charAdded = true;
+          }  
           break;
         default:
           if (input_c > 96 && input_c < 123) {
             input_c -= 32; // subtract to get lower
           }
+
           if (input_c > 64 && input_c < 91) {
             _current_typed_word += char(input_c);
             charAdded = true;
@@ -485,13 +489,13 @@ void GameManager::gameLoop () {
       addch('-');
     }
     
-    if (charAdded ) {
+    if (charAdded && _current_typed_word.length() > 0) {
       // Forgiving mode means you can't type an invalid word
       if (_forgivingMode) {
         // Returns true if current word matches anything on screen
         // note: contains other logic as well
         if (!checkAllWordsMatch(_current_typed_word.back())) {
-          if (_current_typed_word.length() > 0)  _current_typed_word.pop_back();
+          _current_typed_word.pop_back();
           
         }
       } 
@@ -511,11 +515,13 @@ void GameManager::gameLoop () {
     mvprintw(_max_y-2, _max_x - (lifemsg.length() + std::to_string(_lives).length() + 1), "%s %d", lifemsg.c_str(), _lives);
 
     // Debug string
-    mvprintw(0, 0, "DEBUG: %s", _debug_string);
+    if (_debug_string.length() > 0) mvprintw(0, 0, "DEBUG: %s", _debug_string);
+    
     
     // Draw current word being typed
-    mvprintw(_max_y-1, _max_x/2 - _current_typed_word.length()/2, "%s", _current_typed_word.c_str());
-
+    if (_current_typed_word.length() > 0) {
+      mvprintw(_max_y-1, _max_x/2 - _current_typed_word.length()/2, "%s", _current_typed_word.c_str());
+    }
     // Send changes to screen
     refresh(); 
 

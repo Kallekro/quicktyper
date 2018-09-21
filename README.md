@@ -14,6 +14,8 @@ You might have to use the flag -std=c++11 to force the compiler to C++11 syntax 
 
 Then you can run the game with ./quicktyper
 
+The size of your terminal determines the play area, so if you want to challenge yourself run it in a small window. Otherwise crank it to the max.
+
 ## ncurses install
 To install ncurses for linux distributions with apt-get:
 ```
